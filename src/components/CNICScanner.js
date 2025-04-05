@@ -2,10 +2,24 @@ import React, { useState, useRef } from "react";
 import Webcam from "react-webcam";
 import Tesseract from "tesseract.js";
 
+// Camera configuration
+const cameraConfig = {
+  backCamera: { facingMode: { exact: "environment" } },
+  frontCamera: { facingMode: "user" }
+};
+
+// Regex patterns for data extraction
+const patterns = {
+  cnic: /\b\d{5}-\d{7}-\d{1}\b/g,
+  name: /(name|nama|نام|nm)\s*[:]?\s*([a-z]+(?:\s+[a-z]+)+)/i,
+  fatherName: /(father['']?s? name|father|والد)\s*[:]?\s*([a-z]+(?:\s+[a-z]+)+)/i,
+  dob: /(dob|date of birth|birth date|تاریخ پیدائش)\s*[:]?\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
+};
+
 const CNICScanner = () => {
-  const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cameraType, setCameraType] = useState("back");
   const [formData, setFormData] = useState({
     name: "",
     fatherName: "",
@@ -14,16 +28,13 @@ const CNICScanner = () => {
   });
   const webcamRef = useRef(null);
 
-  // Capture image from webcam
   const captureImage = () => {
     setLoading(true);
     setError("");
     const imageSrc = webcamRef.current.getScreenshot();
-    setImage(imageSrc);
     extractText(imageSrc);
   };
 
-  // Extract text using Tesseract OCR
   const extractText = async (imageSrc) => {
     try {
       const { data: { text } } = await Tesseract.recognize(
@@ -33,77 +44,81 @@ const CNICScanner = () => {
       );
       parseCNICData(text);
     } catch (err) {
-      setError("Failed to scan. Try again with a clearer image.");
+      setError("Scan failed. Ensure the ID is clear and well-lit.");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Parse extracted text to fill form
   const parseCNICData = (text) => {
-    // Extract CNIC (XXXXX-XXXXXXX-X)
-    const cnicRegex = /\b\d{5}-\d{7}-\d{1}\b/g;
-    const cnicNumber = text.match(cnicRegex)?.[0] || "";
+    const cleanText = text.replace(/\n/g, " ").replace(/\s+/g, " ");
+    
+    const cnicNumber = cleanText.match(patterns.cnic)?.[0] || "";
+    const nameMatch = cleanText.match(patterns.name);
+    const fatherNameMatch = cleanText.match(patterns.fatherName);
+    const dobMatch = cleanText.match(patterns.dob);
 
-    // Extract Name (Assuming format: "Name: John Doe" or "NAME: JOHN DOE")
-    const nameMatch = text.match(/Name:\s*([^\n]+)/i);
-    const name = nameMatch ? nameMatch[1].trim() : "";
-
-    // Extract Father's Name (Assuming format: "Father's Name: Ali Khan")
-    const fatherNameMatch = text.match(/Father['’]?s Name:\s*([^\n]+)/i);
-    const fatherName = fatherNameMatch ? fatherNameMatch[1].trim() : "";
-
-    // Extract DOB (Assuming format: "DOB: 01-01-1990" or "Date of Birth: 01/01/1990")
-    const dobMatch = text.match(/DOB:\s*([^\n]+)/i);
-    let dob = dobMatch ? dobMatch[1].trim() : "";
-
-    // Format date if needed (e.g., "01/01/1990" → "01-01-1990")
-    if (dob.includes("/")) {
-      dob = dob.replace(/\//g, "-");
-    }
+    let dob = dobMatch ? dobMatch[2].trim() : "";
+    if (dob.includes("/")) dob = dob.replace(/\//g, "-");
 
     setFormData({
-      name,
-      fatherName,
+      name: nameMatch ? nameMatch[2].trim() : "",
+      fatherName: fatherNameMatch ? fatherNameMatch[2].trim() : "",
       cnicNumber,
-      dob,
+      dob
     });
+  };
+
+  const toggleCamera = () => {
+    setCameraType(prev => prev === "back" ? "front" : "back");
   };
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px" }}>
-      <h1 style={{ textAlign: "center" }}>CNIC Scanner & Auto-Fill Form</h1>
+      <h1 style={{ textAlign: "center" }}>ID Card Scanner</h1>
       
-      {/* Webcam for scanning */}
       <div style={{ margin: "20px 0", textAlign: "center" }}>
         <Webcam
           audio={false}
           ref={webcamRef}
           screenshotFormat="image/jpeg"
           style={{ width: "100%", borderRadius: "8px" }}
+          videoConstraints={cameraType === "back" ? cameraConfig.backCamera : cameraConfig.frontCamera}
         />
-        <button 
-          onClick={captureImage} 
-          disabled={loading}
-          style={{
-            marginTop: "10px",
-            padding: "10px 20px",
-            background: loading ? "#ccc" : "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Scanning..." : "Capture & Auto-Fill"}
-        </button>
+        <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+          <button 
+            onClick={captureImage} 
+            disabled={loading}
+            style={{
+              padding: "10px 20px",
+              background: loading ? "#ccc" : "#007bff",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            {loading ? "Scanning..." : "Scan ID"}
+          </button>
+          <button 
+            onClick={toggleCamera}
+            style={{
+              padding: "10px 20px",
+              background: "#6c757d",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Switch to {cameraType === "back" ? "Front" : "Back"} Camera
+          </button>
+        </div>
       </div>
 
-      {/* Display error if any */}
       {error && <p style={{ color: "red", textAlign: "center" }}>{error}</p>}
 
-      {/* Auto-filled form */}
       <form style={{ background: "#f9f9f9", padding: "20px", borderRadius: "8px" }}>
         <div style={{ marginBottom: "15px" }}>
           <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>Name:</label>
