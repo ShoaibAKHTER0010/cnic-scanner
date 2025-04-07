@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Webcam from "react-webcam";
 import Tesseract from "tesseract.js";
 
@@ -15,8 +15,23 @@ const CNICScanner = () => {
     issueDate: "",
     expiryDate: "",
   });
+  const [facingMode, setFacingMode] = useState("user"); // Default: front camera
 
   const webcamRef = useRef(null);
+
+  // Detect device type and set camera
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      setFacingMode("environment"); // Use back camera on mobile
+    }
+  }, []);
+
+  const videoConstraints = {
+    facingMode: facingMode,
+    width: 350,
+    height: 350,
+  };
 
   const captureImage = () => {
     const imageSrc = webcamRef.current.getScreenshot();
@@ -45,7 +60,7 @@ const CNICScanner = () => {
     let cnicNumber = "";
     let dob = "";
     let gender = "";
-    let country = "Pakistan"; // default if not found
+    let country = "Pakistan";
     let issueDate = "";
     let expiryDate = "";
 
@@ -110,8 +125,10 @@ const CNICScanner = () => {
           ref={webcamRef}
           screenshotFormat="image/jpeg"
           width={350}
+          videoConstraints={videoConstraints}
         />
       </div>
+
       <div style={{ textAlign: "center", marginBottom: "30px" }}>
         <button onClick={captureImage} style={{ padding: "10px 20px", fontSize: "16px", cursor: "pointer" }}>
           Capture & Scan
@@ -155,7 +172,6 @@ const CNICScanner = () => {
         </form>
       </div>
 
-      {/* Optional: Debug text output */}
       <div style={{ maxWidth: "600px", margin: "30px auto", fontSize: "12px", color: "#777" }}>
         <h4>Extracted OCR Text (for debugging):</h4>
         <pre>{text}</pre>
