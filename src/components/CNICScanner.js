@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import Webcam from "react-webcam";
 import Tesseract from "tesseract.js";
 
@@ -15,18 +15,8 @@ const CNICScanner = () => {
     issueDate: "",
     expiryDate: "",
   });
-  const [facingMode, setFacingMode] = useState("user"); // default front camera
+
   const webcamRef = useRef(null);
-
-  const videoConstraints = {
-    facingMode: facingMode, // "user" for front, "environment" for back
-    width: 350,
-    height: 350,
-  };
-
-  const switchCamera = () => {
-    setFacingMode((prevMode) => (prevMode === "user" ? "environment" : "user"));
-  };
 
   const captureImage = () => {
     const imageSrc = webcamRef.current.getScreenshot();
@@ -62,38 +52,35 @@ const CNICScanner = () => {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (!name && /^[A-Za-z ]{3,}$/.test(line)) {
-        name = line;
-        continue;
-      }
-
-      if (name && !fatherName && /^[A-Za-z ]{3,}$/.test(line)) {
-        fatherName = line;
-        continue;
-      }
-
       if (!cnicNumber && /\d{5}-\d{7}-\d{1}/.test(line)) {
         cnicNumber = line.match(/\d{5}-\d{7}-\d{1}/)[0];
         continue;
       }
 
-      if (!dob && /(\d{2}-\d{2}-\d{4})/.test(line) && line.toLowerCase().includes("birth")) {
-        dob = line.match(/(\d{2}-\d{2}-\d{4})/)[0];
+      if (!gender && /\b(M|F|Male|Female)\b/i.test(line)) {
+        gender = line.match(/\b(M|F|Male|Female)\b/i)[0];
         continue;
       }
 
-      if (!issueDate && /issue/i.test(line) && /(\d{2}-\d{2}-\d{4})/.test(line)) {
-        issueDate = line.match(/(\d{2}-\d{2}-\d{4})/)[0];
+      // Look for three date patterns in a line (DOB, Issue, Expiry)
+      if ((dob === "" || issueDate === "" || expiryDate === "") && /\d{2}\.\d{2}\.\d{4}/.test(line)) {
+        const matches = line.match(/\d{2}\.\d{2}\.\d{4}/g);
+        if (matches) {
+          if (matches[0] && !dob) dob = matches[0];
+          if (matches[1] && !issueDate) issueDate = matches[1];
+          if (matches[2] && !expiryDate) expiryDate = matches[2];
+        }
         continue;
       }
 
-      if (!expiryDate && /expiry/i.test(line) && /(\d{2}-\d{2}-\d{4})/.test(line)) {
-        expiryDate = line.match(/(\d{2}-\d{2}-\d{4})/)[0];
+      // Name and Father's Name
+      if (!name && /^[A-Z][a-z]+\s[A-Z][a-z]+/.test(line)) {
+        name = line;
         continue;
       }
 
-      if (!gender && /(Male|Female)/i.test(line)) {
-        gender = line.match(/(Male|Female)/i)[0];
+      if (name && !fatherName && /^[A-Z][a-z]+\s[A-Z][a-z]+/.test(line)) {
+        fatherName = line;
         continue;
       }
     }
@@ -102,11 +89,11 @@ const CNICScanner = () => {
       name,
       fatherName,
       cnicNumber,
-      dob,
+      dob: dob.replace(/\./g, "-"),
       gender,
       country,
-      issueDate,
-      expiryDate,
+      issueDate: issueDate.replace(/\./g, "-"),
+      expiryDate: expiryDate.replace(/\./g, "-"),
     });
   };
 
@@ -114,22 +101,22 @@ const CNICScanner = () => {
     <div style={{ fontFamily: "Arial, sans-serif", padding: "30px", backgroundColor: "#f4f4f4", minHeight: "100vh" }}>
       <h1 style={{ textAlign: "center" }}>CNIC Scanner & Auto-Fill Form</h1>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
         <Webcam
           audio={false}
           ref={webcamRef}
           screenshotFormat="image/jpeg"
-          videoConstraints={videoConstraints}
           width={350}
+          videoConstraints={{
+            facingMode: typeof window !== "undefined" && /Mobi|Android/i.test(navigator.userAgent) ? { exact: "environment" } : "user",
+          }}
         />
-        <div style={{ marginTop: "10px" }}>
-          <button onClick={switchCamera} style={{ padding: "8px 15px", marginRight: "10px", cursor: "pointer" }}>
-            Switch Camera
-          </button>
-          <button onClick={captureImage} style={{ padding: "8px 15px", cursor: "pointer" }}>
-            Capture & Scan
-          </button>
-        </div>
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: "30px" }}>
+        <button onClick={captureImage} style={{ padding: "10px 20px", fontSize: "16px", cursor: "pointer" }}>
+          Capture & Scan
+        </button>
       </div>
 
       {image && (
@@ -169,6 +156,7 @@ const CNICScanner = () => {
         </form>
       </div>
 
+      {/* Debugging Text */}
       <div style={{ maxWidth: "600px", margin: "30px auto", fontSize: "12px", color: "#777" }}>
         <h4>Extracted OCR Text (for debugging):</h4>
         <pre>{text}</pre>
