@@ -15,22 +15,17 @@ const CNICScanner = () => {
     issueDate: "",
     expiryDate: "",
   });
-  const [facingMode, setFacingMode] = useState("user"); // Default: front camera
-
+  const [facingMode, setFacingMode] = useState("user"); // default front camera
   const webcamRef = useRef(null);
 
-  // Detect device type and set camera
-  useEffect(() => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
-      setFacingMode("environment"); // Use back camera on mobile
-    }
-  }, []);
-
   const videoConstraints = {
-    facingMode: facingMode,
+    facingMode: facingMode, // "user" for front, "environment" for back
     width: 350,
     height: 350,
+  };
+
+  const switchCamera = () => {
+    setFacingMode((prevMode) => (prevMode === "user" ? "environment" : "user"));
   };
 
   const captureImage = () => {
@@ -119,20 +114,22 @@ const CNICScanner = () => {
     <div style={{ fontFamily: "Arial, sans-serif", padding: "30px", backgroundColor: "#f4f4f4", minHeight: "100vh" }}>
       <h1 style={{ textAlign: "center" }}>CNIC Scanner & Auto-Fill Form</h1>
 
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "20px" }}>
         <Webcam
           audio={false}
           ref={webcamRef}
           screenshotFormat="image/jpeg"
-          width={350}
           videoConstraints={videoConstraints}
+          width={350}
         />
-      </div>
-
-      <div style={{ textAlign: "center", marginBottom: "30px" }}>
-        <button onClick={captureImage} style={{ padding: "10px 20px", fontSize: "16px", cursor: "pointer" }}>
-          Capture & Scan
-        </button>
+        <div style={{ marginTop: "10px" }}>
+          <button onClick={switchCamera} style={{ padding: "8px 15px", marginRight: "10px", cursor: "pointer" }}>
+            Switch Camera
+          </button>
+          <button onClick={captureImage} style={{ padding: "8px 15px", cursor: "pointer" }}>
+            Capture & Scan
+          </button>
+        </div>
       </div>
 
       {image && (
